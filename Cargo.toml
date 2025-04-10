@@ -1,0 +1,8 @@
+[package]
+name = "star_viewer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+curl = "0.4.47"
+fitrs = "0.5.0"
