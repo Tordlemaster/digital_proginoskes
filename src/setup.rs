@@ -9,6 +9,7 @@
 //Each cell of the quadtree should have an average color value so that
 //if there are many stars packed into 1 pixel the quadtree navigation can stop at that point and just return the precalculated value
 
+use std::io::BufWriter;
 use std::{fs, io::Write};
 use std::fs::OpenOptions;
 use std::path::Path;
@@ -33,11 +34,23 @@ fn data_write_fn(data: &[u8]) -> Result<usize, WriteError> {
 
 fn download_data() {
     fs::create_dir_all("./data/download").unwrap();
+    let file = OpenOptions::new()
+        .truncate(true)
+        .write(true)
+        .create(true)
+        .open("./data/download/I_259.tar.gz")
+        .unwrap();
+    let mut buf = BufWriter::new(file);
 
     let mut easy = Easy::new();
     easy.url(TYCHO_2_URL).unwrap();
-    easy.write_function(data_write_fn).unwrap();
-    easy.perform().unwrap();
+    easy.write_function(move |data| {
+        match buf.write(data) {
+            Ok(n) => Ok(n),
+            Err(_) => Err(WriteError::Pause)
+        }
+    }).expect("File write failed");
+    easy.perform().expect("Download failed");
 }
 
 pub fn setup_main(force_download: bool) {

@@ -4,6 +4,6 @@ mod setup;
 mod render;
 
 fn main() {
-    setup_main(false);
+    setup_main(true);
     //println!("Hello, world!");
 }
