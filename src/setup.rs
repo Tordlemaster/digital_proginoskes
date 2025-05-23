@@ -18,6 +18,8 @@ use std::path::{Path, PathBuf};
 
 use curl::easy::{Easy, WriteError};
 
+mod spherical_quadtree;
+
 
 const TYCHO_2_URL: &str = "https://cdsarc.u-strasbg.fr/viz-bin/nph-Cat/tar.gz?I/259";
 
@@ -99,6 +101,7 @@ fn extract_data() {
     let _ = fs::remove_dir_all("./data/download/tmp");
 }
 
+//Have one thread that processes the file and appends the data to a structure and another that constructs the quadtree
 fn generate_cpu_quadtree() {
     for i in 0..=19 {
         let f_name = format!("tyc2.dat.{:02}.gz", i);
