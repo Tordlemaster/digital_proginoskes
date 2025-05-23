@@ -17,6 +17,7 @@ use std::fs::{canonicalize, File, OpenOptions};
 use std::path::{Path, PathBuf};
 
 use curl::easy::{Easy, WriteError};
+use spherical_quadtree::{SphQtRoot, StarData};
 
 mod spherical_quadtree;
 
@@ -102,18 +103,36 @@ fn extract_data() {
 }
 
 //Have one thread that processes the file and appends the data to a structure and another that constructs the quadtree
-fn generate_cpu_quadtree() {
+fn generate_cpu_quadtree(sph_qt: &mut spherical_quadtree::SphQtRoot) {
     for i in 0..=19 {
-        let f_name = format!("tyc2.dat.{:02}.gz", i);
-        let f_path: String = format!("./data/download/tmp/{}", f_name);
+        let f_name = format!("tyc2.dat.{:02}", i);
+        let f_path: String = format!("./data/download/extract/{}", f_name);
+
+        println!("Attempting to open{}", &f_path);
 
         let file = File::open(f_path).unwrap();
         let mut buf = BufReader::new(file);
 
         let mut s = String::new();
+        let mut star_idx: u64 = 0;
         while buf.read_line(&mut s).unwrap() > 0 {
-            let entry: Vec<&str> = s.split(|c|{c == '|'}).collect();
-            //Replace above line with a FromStr trait implemented on a star quadtree entry struct?
+            let entry: Vec<&str> = s.split(|c|{c == '|'}).map(|x| {x.trim()}).collect();
+            //println!("{:?}", entry);
+            if entry[1].contains(|x|{x=='P' || x=='X'}) {
+                continue;
+            }
+            else {
+                let star: spherical_quadtree::StarData = StarData {
+                    ra: entry[2].parse().expect("RA not a valid f32"),
+                    dec: entry[3].parse().expect("Dec not a valid f32"),
+                    bt: entry[17].parse().expect("BT not a valid f32"),
+                    vt: entry[19].parse().expect("VT not a valid f32")
+                };
+                sph_qt.add(star, star_idx);
+                print!("\r{} star entries processed", star_idx);
+                star_idx += 1;
+                //Replace above line with a FromStr trait implemented on a star quadtree entry struct?
+            }
         }
     }
 }
@@ -127,4 +146,7 @@ pub fn setup_main(force_download: bool, force_extract: bool) {
     if force_download || force_extract || !extract_path.exists() {
         extract_data();
     }
+
+    let mut quadtree = SphQtRoot::new();
+    generate_cpu_quadtree(&mut quadtree);
 }

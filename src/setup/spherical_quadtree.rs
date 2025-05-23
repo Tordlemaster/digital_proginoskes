@@ -2,10 +2,10 @@ const MAX_DEPTH: i32 = 8;
 
 
 pub struct StarData {
-    ra: f32, //Right ascension
-    dec: f32, //Declination
-    bt: f32, 
-    vt: f32
+    pub ra: f32, //Right ascension
+    pub dec: f32, //Declination
+    pub bt: f32, 
+    pub vt: f32
 }
 
 struct SphQtNode {
@@ -28,8 +28,8 @@ impl SphQtNode {
 
         SphQtNode {
             star_idxs: Vec::new(),
-            corners: [[corners[lowest_coords[0]][0], corners[lowest_coords[1]][1]], [corners[!lowest_coords[0]][0], corners[!lowest_coords[1]][1]]],
-            midpoint: [(corners[0][ax[0]] + corners[1][ax[0]]) / 2.0, (corners[0][ax[1]] + corners[1][ax[1]]) / 2.0],
+            corners: [[corners[lowest_coords[0]][0], corners[lowest_coords[1]][1]], [corners[(lowest_coords[0] != 1) as usize][0], corners[(lowest_coords[1] != 1) as usize][1]]],
+            midpoint: [(corners[0][0] + corners[1][0]) / 2.0, (corners[0][1] + corners[1][1]) / 2.0],
             axes: ax,
             inactive_ax: inac_ax,
             children: [const{None}; 4]
@@ -55,7 +55,7 @@ impl SphQtRoot {
         ] }
     }
 
-    pub fn add(&mut self, star: &StarData, idx: u64) {
+    pub fn add(&mut self, star: StarData, idx: u64) {
         //Determine face of cube sphere TODO REWORK
         /*let mut face_idx = 0;
         let mut axis: u8 = 0;
@@ -135,7 +135,7 @@ impl SphQtRoot {
             depth += 1;
         }
         //Add star data to the leaf node
-        cur_parent.as_mut().unwrap().star_idxs.push(*star);
+        cur_parent.as_mut().unwrap().star_idxs.push(star);
 
         //append idx to the star_idxs at the leaf node
     }
