@@ -12,6 +12,9 @@
 
 use std::io::{BufRead, BufReader, BufWriter};
 use std::process::Command;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Instant;
 use std::{fs, io::Write};
 use std::fs::{canonicalize, File, OpenOptions};
 use std::path::{Path, PathBuf};
@@ -103,38 +106,55 @@ fn extract_data() {
 }
 
 //Have one thread that processes the file and appends the data to a structure and another that constructs the quadtree
-fn generate_cpu_quadtree(sph_qt: &mut spherical_quadtree::SphQtRoot) {
-    for i in 0..=19 {
-        let f_name = format!("tyc2.dat.{:02}", i);
-        let f_path: String = format!("./data/download/extract/{}", f_name);
+fn generate_cpu_quadtree_thread(sph_qt: Arc<Mutex<&mut SphQtRoot>>, file_index: i32) {
+    //Launch a thread for each star data file and one more to add the stars to the quadtree with an mpsc model
 
-        println!("Attempting to open{}", &f_path);
+    let f_name = format!("tyc2.dat.{:02}", file_index);
+    let f_path: String = format!("./data/download/extract/{}", f_name);
 
-        let file = File::open(f_path).unwrap();
-        let mut buf = BufReader::new(file);
+    println!("Attempting to open{}", &f_path);
 
-        let mut s = String::new();
-        let mut star_idx: u64 = 0;
-        while buf.read_line(&mut s).unwrap() > 0 {
-            let entry: Vec<&str> = s.split(|c|{c == '|'}).map(|x| {x.trim()}).collect();
-            //println!("{:?}", entry);
-            if entry[1].contains(|x|{x=='P' || x=='X'}) {
-                continue;
-            }
-            else {
-                let star: spherical_quadtree::StarData = StarData {
-                    ra: entry[2].parse().expect("RA not a valid f32"),
-                    dec: entry[3].parse().expect("Dec not a valid f32"),
-                    bt: entry[17].parse().expect("BT not a valid f32"),
-                    vt: entry[19].parse().expect("VT not a valid f32")
-                };
-                sph_qt.add(star, star_idx);
-                print!("\r{} star entries processed", star_idx);
-                star_idx += 1;
-                //Replace above line with a FromStr trait implemented on a star quadtree entry struct?
-            }
+    let file = File::open(f_path).unwrap();
+    let mut buf = BufReader::new(file);
+
+    let mut s = String::new();
+    while buf.read_line(&mut s).unwrap() > 0 {
+        let entry: Vec<&str> = s.split(|c|{c == '|'}).map(|x| {x.trim()}).collect();
+        //println!("{:?}", entry);
+        if entry[19].parse::<f32>().expect("VT not a valid f32") > 10.0 || entry[1].contains(|x|{x=='P' || x=='X'}) {
+            continue;
+        }
+        else {
+            let star: spherical_quadtree::StarData = StarData {
+                ra: entry[2].parse().expect("RA not a valid f32"),
+                dec: entry[3].parse().expect("Dec not a valid f32"),
+                bt: entry[17].parse().expect("BT not a valid f32"),
+                vt: entry[19].parse().expect("VT not a valid f32")
+            };
+            let mut sph_qt_locked = sph_qt.lock().unwrap(); //Lock the mutex
+            sph_qt_locked.add(star);
+            drop(sph_qt_locked); //Unlock the mutex
+            //Replace above line with a FromStr trait implemented on a star quadtree entry struct?
         }
     }
+}
+
+fn generate_cpu_quadtree(sph_qt: &mut spherical_quadtree::SphQtRoot) {
+    let qt_mutex = Arc::new(Mutex::new(sph_qt));
+
+    let start = Instant::now();
+    thread::scope(|s| {
+        let mut handles = Vec::new();
+        for i in 0..=19 {
+            let qt_mutex = Arc::clone(&qt_mutex);
+            handles.push(s.spawn(move || generate_cpu_quadtree_thread(qt_mutex, i)));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+    });
+    let duration = start.elapsed();
+    println!("Quadtree construction took {} seconds", duration.as_secs_f32());
 }
 
 pub fn setup_main(force_download: bool, force_extract: bool) {
