@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 curl = "0.4.47"
 fitrs = "0.5.0"
+glam = "0.30.3"
+glfw = "0.59.0"
 
 [build]
 rustflags = ["-C", "target-cpu=native"]

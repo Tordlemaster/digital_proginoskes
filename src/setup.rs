@@ -15,7 +15,7 @@ use std::process::Command;
 use std::time::Instant;
 use std::{fs, io::Write};
 use std::fs::{canonicalize, File, OpenOptions};
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 
 use curl::easy::{Easy, WriteError};
 use spherical_quadtree::{SphQtRoot, StarData};
@@ -204,17 +204,21 @@ fn generate_cpu_quadtree(sph_qt: &mut spherical_quadtree::SphQtRoot) {
     println!("\nCreated quadtree from {} stars in {} seconds", star_count, duration.as_secs_f32());
 }
 
-pub fn setup_main(force_download: bool, force_extract: bool) {
+pub fn setup_main(force_download: bool, force_extract: bool, force_prune: bool) {
     let data_path: &Path = Path::new("./data/download/I_259.tar.gz");
     let extract_path: &Path = Path::new("./data/download/extract");
+    let cache_path: &Path = Path::new("./data/cache/pruned_stars.dat");
+
     if force_download || !data_path.exists() {
         download_data();
     }
     if force_download || force_extract || !extract_path.exists() {
         extract_data();
     }
+    if force_prune || force_download || force_extract || !cache_path.exists() {
+        prune_stars(16.0);
+    }
 
-    prune_stars(16.0);
     let mut quadtree = SphQtRoot::new();
     generate_cpu_quadtree(&mut quadtree);
 }

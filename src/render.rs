@@ -6,3 +6,47 @@
 //unbounded number of stars every frame
 
 //Stars themselves have a solid angle (at least a perceptual one based on naked eye fov, that is invariant(doesn't change rel. to screen) to zoom level)
+
+use glfw::{fail_on_errors, Action, Context, Glfw, GlfwReceiver, Key, PWindow, WindowEvent};
+
+const SCR_WIDTH: u32 = 1920;
+const SCR_HEIGHT: u32 = 1080;
+
+struct WindowData {
+    window: PWindow,
+    events: GlfwReceiver<(f64, WindowEvent)>
+}
+
+fn render_setup(gl_context: &mut Glfw, scr_width: u32, scr_height: u32) -> WindowData {
+    let (mut window, events) = gl_context.create_window(scr_width, scr_height, "Digital Progonoskes", glfw::WindowMode::Windowed).expect("Failed to create window");
+    window.make_current();
+    window.set_key_polling(true);
+
+    WindowData { window: window, events: events }
+}
+
+fn render_loop(gl_context: &mut Glfw, wd: &mut WindowData) {
+    while !wd.window.should_close() {
+
+        //Take keyboard input
+        gl_context.poll_events();
+        for (_, event) in glfw::flush_messages(&wd.events) {
+            println!("{:?}", event);
+            match event {
+                glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) =>
+                    wd.window.set_should_close(true),
+                _ => {}
+            }
+        }
+
+        //Swap buffers
+        wd.window.swap_buffers();
+    }
+}
+
+pub fn render_main() {
+    let mut gl_context = glfw::init(fail_on_errors!()).unwrap();
+    let mut window_data = render_setup(&mut gl_context, SCR_WIDTH, SCR_HEIGHT);
+
+    render_loop(&mut gl_context, &mut window_data);
+}
