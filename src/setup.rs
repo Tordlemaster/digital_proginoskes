@@ -10,7 +10,7 @@
 //Each cell of the quadtree should have an average color value so that
 //if there are many stars packed into 1 pixel the quadtree navigation can stop at that point and just return the precalculated value
 
-use std::io::{BufRead, BufReader, BufWriter};
+use std::io::{BufRead, BufReader, BufWriter, Read};
 use std::process::Command;
 use std::time::Instant;
 use std::{fs, io::Write};
@@ -139,7 +139,7 @@ fn prune_stars(min_magnitude: f32) {
                 panic!("entry too short");
             }*/
 
-            if entry[2].len() > 0 && entry[3].len() > 0 && entry[17].len() > 0 && entry[19].len() > 0 &&!entry[1].contains(|x|{x=='P' || x=='X'}) {
+            if entry[2].len() > 0 && entry[3].len() > 0 && entry[17].len() > 0 && entry[19].len() > 0 && entry[19].parse::<f32>().unwrap() < min_magnitude && !entry[1].contains(|x|{x=='P' || x=='X'}) {
                 let ra = entry[2].parse::<f32>().expect("RA not a valid f32").to_ne_bytes();
                 let dec = entry[3].parse::<f32>().expect("Dec not a valid f32").to_ne_bytes();
                 let bt = entry[17].parse::<f32>().expect("BT not a valid f32").to_ne_bytes();
@@ -178,36 +178,30 @@ fn prune_stars(min_magnitude: f32) {
 
 //Have one thread that processes the file and appends the data to a structure and another that constructs the quadtree
 fn generate_cpu_quadtree(sph_qt: &mut spherical_quadtree::SphQtRoot) {
-    for i in 0..=19 {
-        let f_name = format!("tyc2.dat.{:02}", i);
-        let f_path: String = format!("./data/download/extract/{}", f_name);
+    let file = File::open("./data/cache/pruned_stars.dat").unwrap();
+    let mut buf = BufReader::new(file);
+    let mut star_entry: [u8; 16] = [0; 16];
 
-        println!("Attempting to open{}", &f_path);
+    let mut star_count: u64 = 0;
 
-        let file = File::open(f_path).unwrap();
-        let mut buf = BufReader::new(file);
+    let start = Instant::now();
 
-        let mut s = String::new();
-        let mut star_idx: u64 = 0;
-        while buf.read_line(&mut s).unwrap() > 0 {
-            let entry: Vec<&str> = s.split(|c|{c == '|'}).map(|x| {x.trim()}).collect();
-            //println!("{:?}", entry);
-            if entry[1].contains(|x|{x=='P' || x=='X'}) {
-                continue;
-            }
-            else {
-                let star: spherical_quadtree::StarData = StarData {
-                    ra: entry[2].parse().expect("RA not a valid f32"),
-                    dec: entry[3].parse().expect("Dec not a valid f32"),
-                    bt: entry[17].parse().expect("BT not a valid f32"),
-                    vt: entry[19].parse().expect("VT not a valid f32")
-                };
-                sph_qt.add(star);
-                print!("\r{} star entries processed", star_idx);
-                //Replace above line with a FromStr trait implemented on a star quadtree entry struct?
-            }
+    while buf.read_exact(&mut star_entry).is_ok() {
+        let star: spherical_quadtree::StarData = StarData {
+            ra: f32::from_ne_bytes(star_entry[0..4].try_into().unwrap()),
+            dec: f32::from_ne_bytes(star_entry[4..8].try_into().unwrap()),
+            bt: f32::from_ne_bytes(star_entry[8..12].try_into().unwrap()),
+            vt: f32::from_ne_bytes(star_entry[12..16].try_into().unwrap())
+        };
+        sph_qt.add(star);
+        star_count += 1;
+        if start.elapsed().as_secs_f32().fract()<0.05 {
+            print!("\r{} stars processed", star_count);
         }
     }
+
+    let duration = start.elapsed();
+    println!("\nCreated quadtree from {} stars in {} seconds", star_count, duration.as_secs_f32());
 }
 
 pub fn setup_main(force_download: bool, force_extract: bool) {
@@ -220,7 +214,7 @@ pub fn setup_main(force_download: bool, force_extract: bool) {
         extract_data();
     }
 
-    prune_stars(7.0);
-    //let mut quadtree = SphQtRoot::new();
-    //generate_cpu_quadtree(&mut quadtree);
+    prune_stars(16.0);
+    let mut quadtree = SphQtRoot::new();
+    generate_cpu_quadtree(&mut quadtree);
 }
