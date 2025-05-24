@@ -12,6 +12,7 @@
 
 use std::io::{BufRead, BufReader, BufWriter};
 use std::process::Command;
+use std::time::Instant;
 use std::{fs, io::Write};
 use std::fs::{canonicalize, File, OpenOptions};
 use std::path::{Path, PathBuf};
@@ -102,6 +103,79 @@ fn extract_data() {
     let _ = fs::remove_dir_all("./data/download/tmp");
 }
 
+//Read through the star data and write the data from stars brighter than min_magnitude to a file.
+fn prune_stars(min_magnitude: f32) {
+
+    fs::create_dir_all("./data/cache").unwrap();
+    let file = OpenOptions::new()
+        .truncate(true)
+        .write(true)
+        .create(true)
+        .open("./data/cache/pruned_stars.dat")
+        .unwrap();
+    let mut write_buf = BufWriter::new(file);
+    
+    let mut star_count: u64 = 0;
+    let mut pruned_star_count: u64 = 0;
+
+    let start = Instant::now();
+    
+    for i in 0..=19 {
+        let f_name = format!("tyc2.dat.{:02}", i);
+        let f_path: String = format!("./data/download/extract/{}", f_name);
+
+        //println!("Attempting to open {}", &f_path);
+
+        let file = File::open(f_path).unwrap();
+        let mut buf = BufReader::new(file);
+
+        let mut s = String::new();
+        while buf.read_line(&mut s).unwrap() > 0 {
+            //TODO NOT CORRECTLY READING UNTIL EOL
+
+            let entry: Vec<&str> = s.split(|c|{c == '|'}).map(|x| {x.trim()}).collect();
+            /*println!("{:?}", entry);
+            if (entry.len() < 19) {
+                panic!("entry too short");
+            }*/
+
+            if entry[2].len() > 0 && entry[3].len() > 0 && entry[17].len() > 0 && entry[19].len() > 0 &&!entry[1].contains(|x|{x=='P' || x=='X'}) {
+                let ra = entry[2].parse::<f32>().expect("RA not a valid f32").to_ne_bytes();
+                let dec = entry[3].parse::<f32>().expect("Dec not a valid f32").to_ne_bytes();
+                let bt = entry[17].parse::<f32>().expect("BT not a valid f32").to_ne_bytes();
+                let vt = entry[19].parse::<f32>().expect("VT not a valid f32").to_ne_bytes();
+                match write_buf.write(&ra) {
+                    Ok(n) => Ok(n),
+                    Err(_) => Err(WriteError::Pause)
+                }.expect("Failed to write");
+                match write_buf.write(&dec) {
+                    Ok(n) => Ok(n),
+                    Err(_) => Err(WriteError::Pause)
+                }.expect("Failed to write");
+                match write_buf.write(&bt) {
+                    Ok(n) => Ok(n),
+                    Err(_) => Err(WriteError::Pause)
+                }.expect("Failed to write");
+                match write_buf.write(&vt) {
+                    Ok(n) => Ok(n),
+                    Err(_) => Err(WriteError::Pause)
+                }.expect("Failed to write");
+
+                pruned_star_count += 1;
+                
+            }
+            s.clear();
+            
+            star_count += 1;
+            if start.elapsed().as_secs_f32().fract()<0.05 {
+                print!("\r{} stars processed", star_count);
+            }
+        }
+    }
+    let duration = start.elapsed();
+    println!("\nPruned list of {} stars into {} entries in {} seconds", star_count, pruned_star_count, duration.as_secs_f32());
+}
+
 //Have one thread that processes the file and appends the data to a structure and another that constructs the quadtree
 fn generate_cpu_quadtree(sph_qt: &mut spherical_quadtree::SphQtRoot) {
     for i in 0..=19 {
@@ -128,9 +202,8 @@ fn generate_cpu_quadtree(sph_qt: &mut spherical_quadtree::SphQtRoot) {
                     bt: entry[17].parse().expect("BT not a valid f32"),
                     vt: entry[19].parse().expect("VT not a valid f32")
                 };
-                sph_qt.add(star, star_idx);
+                sph_qt.add(star);
                 print!("\r{} star entries processed", star_idx);
-                star_idx += 1;
                 //Replace above line with a FromStr trait implemented on a star quadtree entry struct?
             }
         }
@@ -147,6 +220,7 @@ pub fn setup_main(force_download: bool, force_extract: bool) {
         extract_data();
     }
 
-    let mut quadtree = SphQtRoot::new();
-    generate_cpu_quadtree(&mut quadtree);
+    prune_stars(7.0);
+    //let mut quadtree = SphQtRoot::new();
+    //generate_cpu_quadtree(&mut quadtree);
 }

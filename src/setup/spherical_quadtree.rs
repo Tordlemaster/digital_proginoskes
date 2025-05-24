@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 const MAX_DEPTH: i32 = 8;
 
 
@@ -17,8 +19,26 @@ struct SphQtNode {
     children: [Option<Box<SphQtNode>>; 4]
 }
 
+
 pub struct SphQtRoot {
-    pub faces: [Option<Box<SphQtNode>>; 6] //N, S, W, E, T, B
+    pub faces: [Option<Box<SphQtNode>>; 6], //N, S, W, E, T, B
+    pub star_count: usize
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseStarDataError;
+impl FromStr for StarData {
+    type Err = ParseStarDataError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut x = s.split_whitespace().map(|s| s.parse::<f32>().map_err(|_| ParseStarDataError));
+        let ra = x.next().ok_or(ParseStarDataError)??;
+        let dec = x.next().ok_or(ParseStarDataError)??;
+        let bt = x.next().ok_or(ParseStarDataError)??;
+        let vt = x.next().ok_or(ParseStarDataError)??;
+
+        Ok(StarData { ra: ra, dec: dec, bt: bt, vt: vt })
+    }
 }
 
 impl SphQtNode {
@@ -52,10 +72,10 @@ impl SphQtRoot {
             Some(Box::new(SphQtNode::new([[-1.0, -1.0], [-1.0, 1.0]], [0, 2], 1))), //Y-
             Some(Box::new(SphQtNode::new([[-1.0, 1.0], [1.0, 1.0]], [0, 1], 2))), //Z+
             Some(Box::new(SphQtNode::new([[-1.0, -1.0], [1.0, -1.0]], [0, 1], 2))), //Z-
-        ] }
+        ], star_count: 0}
     }
 
-    pub fn add(&mut self, star: StarData, idx: u64) {
+    pub fn add(&mut self, star: StarData) {
         //Determine face of cube sphere TODO REWORK
         /*let mut face_idx = 0;
         let mut axis: u8 = 0;
@@ -136,6 +156,7 @@ impl SphQtRoot {
         }
         //Add star data to the leaf node
         cur_parent.as_mut().unwrap().star_idxs.push(star);
+        self.star_count += 1;
 
         //append idx to the star_idxs at the leaf node
     }
