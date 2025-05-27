@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-const MAX_DEPTH: i32 = 8;
+const MAX_DEPTH: i32 = 4;
 
 
 pub struct StarData {
@@ -13,7 +13,7 @@ pub struct StarData {
 pub struct SphQtNode {
     pub stars: Vec<StarData>,
     pub corners: [[f32; 2]; 2], //corners, least coordinates in position 0 and greatest coordinates in position 1
-    midpoint: [f32; 2],
+    pub midpoint: [f32; 2],
     axes: [usize; 2], //x, y, z
     inactive_ax: usize,
     pub children: [Option<Box<SphQtNode>>; 4],
@@ -49,7 +49,11 @@ impl SphQtNode {
 
         SphQtNode {
             stars: Vec::new(),
-            corners: [[corners[lowest_coords[0]][0], corners[lowest_coords[1]][1]], [corners[(lowest_coords[0] != 1) as usize][0], corners[(lowest_coords[1] != 1) as usize][1]]],
+            corners: [
+                [corners[(lowest_coords[0] != 1) as usize][0], corners[(lowest_coords[1] != 1) as usize][1]],
+                [corners[lowest_coords[0]][0], corners[lowest_coords[1]][1]],
+                
+            ],
             midpoint: [(corners[0][0] + corners[1][0]) / 2.0, (corners[0][1] + corners[1][1]) / 2.0],
             axes: ax,
             inactive_ax: inac_ax,
@@ -140,7 +144,8 @@ impl SphQtRoot {
         while depth < MAX_DEPTH {
             let uw_parent = cur_parent.as_mut().unwrap();
             //determine cell
-            let child_idx: usize = (((star_pos_2d[1] < uw_parent.midpoint[1]) as usize) << 1) | (star_pos_2d[0] > uw_parent.midpoint[0]) as usize;
+            let child_idx: usize = (((star_pos_2d[1] > uw_parent.midpoint[1]) as usize) << 1) | (star_pos_2d[0] > uw_parent.midpoint[0]) as usize;
+            assert!(child_idx < 4);
 
             //child_idx selects the corner of the cell to use as the corner of the new cell along with the midpoint
 

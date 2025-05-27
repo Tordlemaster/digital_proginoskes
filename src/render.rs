@@ -27,7 +27,8 @@ fn draw_debug_quadtree_recur(parent: &Box<SphQtNode>, recursive_transformation: 
     //Transformation matrix should be passed down and applied and modified recursively TODO TODO TODO TODO
     //let edge_len = ((parent.corners[1][0] - parent.corners[0][0]) / 2.0).abs();
     let edge_len = 1.0 / (depth + 1) as f32;
-    let new_transformation = glam::Mat3::from_scale(glam::vec2(edge_len, edge_len)) * glam::Mat3::from_translation(glam::vec2((parent.corners[1][0] + 1.0) / 2.0, (parent.corners[1][1] + 1.0) / 2.0));
+    let edge_len = (parent.corners[1][0] - parent.corners[0][0]).abs() / 2.0;
+    let new_transformation =  glam::Mat3::from_translation(glam::vec2((parent.corners[0][0] + 1.0) / 2.0, (parent.corners[0][1] + 1.0) / 2.0)) * glam::Mat3::from_scale(glam::vec2(edge_len, edge_len));
     //let scale = glam::Mat3::from_scale(glam::vec2(edge_len, edge_len));
     //let translation  = glam::Mat3::from_translation(glam::vec2((parent.corners[1][0] + 1.0) / 2.0, (parent.corners[1][1] + 1.0) / 2.0));
     //let mut transformation = scale * translation * (*recursive_transformation);
@@ -35,16 +36,18 @@ fn draw_debug_quadtree_recur(parent: &Box<SphQtNode>, recursive_transformation: 
     let transformation = *recursive_transformation * new_transformation;
     //let self_transformation = transformation * glam::Mat3::from_scale(glam::vec2(2.0, 2.0)) * glam::Mat3::from_translation(glam::vec2(-0.5, -0.5));
 
-    println!("Layer {}, Position {} {}, Scale {}", depth, (parent.corners[1][0] + 1.0) / 2.0, (parent.corners[1][1] + 1.0) / 2.0, edge_len);
-    println!("Matrix: {}", transformation);
-    println!("Self Matrix: {}", transformation);
+    //println!("Layer {}, Position {} {}, Scale {}", depth, (parent.corners[0][0] + 1.0) / 2.0, (parent.corners[0][1] + 1.0) / 2.0, edge_len);
+    //println!("Corners: {:?} {:?}, Midpoint {:?}", parent.corners[0], parent.corners[1], parent.midpoint);
+    //println!("Matrix: {}", transformation);
+    //println!("New matrix: {}", new_transformation);
+    //println!("Self Matrix: {}", transformation);
     //Draw parent
     let area = edge_len * edge_len;
 
     let mut stars_not_in_children = parent.stars_in_children;
     let mut child_count = 0;
 
-    if depth < 1 {
+    if depth < 11 {
         for c in &parent.children {
             if c.is_some() {
                 child_count += 1;
@@ -57,8 +60,8 @@ fn draw_debug_quadtree_recur(parent: &Box<SphQtNode>, recursive_transformation: 
         }
     }
 
-    let star_density = (stars_not_in_children / max_side_stars) as f32 / (area - ((area / 2.0) * child_count as f32));
-    println!("{} stars", star_density);
+    let star_density = (stars_not_in_children as f32 / max_side_stars as f32) / (area - ((area / 4.0) * child_count as f32));
+    //println!("{} stars, {} stars_not_in_children, {} max_side_stars, {} area, {} star density, {} child_count\n", parent.stars_in_children, stars_not_in_children, max_side_stars, area, star_density, child_count);
 
     unsafe {
         gl::UseProgram(utils::DEBUG_QT_PROGRAM);
@@ -73,14 +76,18 @@ fn draw_debug_quadtree_recur(parent: &Box<SphQtNode>, recursive_transformation: 
     //Draw children in the front and parents in layers behind
     //let mut stars_not_in_children = parent.stars_in_children;
     //let mut child_count = 0;
-    if depth < 1 {
+    let mut i = 0;
+    if depth < 11 {
         for c in &parent.children {
             if c.is_some() {
                 let c_uw = c.as_ref().unwrap();
 
                 //Recur into the child
-                draw_debug_quadtree_recur(c_uw, &transformation, max_side_stars, depth + 1);
+                //if i == 0 || i==1 || i==2 {
+                draw_debug_quadtree_recur(c_uw, recursive_transformation, max_side_stars, depth + 1);
+                //}
             }
+            i+=1;
         }
     }
 }
@@ -108,7 +115,7 @@ fn draw_debug_quadtree(quadtree: &SphQtRoot) {
         max_side_stars = max(max_side_stars, side.as_ref().unwrap().stars_in_children);
     }
     
-    for i in 0..1 {
+    for i in 0..6 {
         //Depth first search
         //Go deep until reach Option<None>
         let side = &quadtree.faces[i];
@@ -125,12 +132,12 @@ fn draw_debug_quadtree(quadtree: &SphQtRoot) {
 
     
 
-    unsafe {
+    /*unsafe {
         gl::UseProgram(utils::DEBUG_QT_PROGRAM);
         gl::BindVertexArray(utils::QUAD_VAO);
         gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
         gl::BindVertexArray(0);
-    }
+    }*/
 }
 
 fn render_setup(gl_context: &mut Glfw, scr_width: u32, scr_height: u32) -> WindowData {
