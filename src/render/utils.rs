@@ -3,10 +3,10 @@ use std::{fs::File, io::Read};
 use gl;
 
 const planeVertices: [f32; 8] = [
-	-1.0, 1.0,
-	-1.0, -1.0,
+	0.0, 1.0,
+	0.0, 0.0,
 	1.0, 1.0,
-	1.0, -1.0,
+	1.0, 0.0,
 ];
 
 const planeTexCoords: [f32; 8] = [
@@ -26,6 +26,9 @@ pub static mut QUAD_VAO: u32 = 0;
 pub static mut QUAD_EBO: u32 = 0;
 
 pub static mut DEBUG_QT_PROGRAM: u32 = 0;
+pub static mut DEBUG_QT_UNI_TRANS: gl::types::GLint = 0;
+pub static mut DEBUG_QT_UNI_STARS: gl::types::GLint = 0;
+pub static mut DEBUG_QT_UNI_DEPTH: gl::types::GLint = 0;
 
 pub fn init_utils() {
     unsafe {//TODO REMOVE INTERLEAVING TO IMPROVE CODE READABILITY
@@ -120,5 +123,8 @@ fn load_shader_program(shaders: Vec<gl::types::GLuint>) -> gl::types::GLuint {
 pub fn setup_debug_qt_program() {
     unsafe {
         DEBUG_QT_PROGRAM = load_shader_program(Vec::from([load_shader(gl::VERTEX_SHADER, "./src/render/shaders/debug_qt.vert"), load_shader(gl::FRAGMENT_SHADER, "./src/render/shaders/debug_qt.frag")]));
+        DEBUG_QT_UNI_TRANS = gl::GetUniformLocation(DEBUG_QT_PROGRAM, "transformation".as_ptr() as *const i8);
+        DEBUG_QT_UNI_STARS = gl::GetUniformLocation(DEBUG_QT_PROGRAM, "star_count".as_ptr() as *const i8);
+        DEBUG_QT_UNI_DEPTH = gl::GetUniformLocation(DEBUG_QT_PROGRAM, "layer".as_ptr() as *const i8);
     }
 }

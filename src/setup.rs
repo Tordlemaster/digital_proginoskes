@@ -18,10 +18,7 @@ use std::fs::{canonicalize, File, OpenOptions};
 use std::path::{Path};
 
 use curl::easy::{Easy, WriteError};
-use spherical_quadtree::{SphQtRoot, StarData};
-
-mod spherical_quadtree;
-
+use crate::spherical_quadtree::{self, SphQtRoot, StarData};
 
 const TYCHO_2_URL: &str = "https://cdsarc.u-strasbg.fr/viz-bin/nph-Cat/tar.gz?I/259";
 
@@ -204,7 +201,7 @@ fn generate_cpu_quadtree(sph_qt: &mut spherical_quadtree::SphQtRoot) {
     println!("\nCreated quadtree from {} stars in {} seconds", star_count, duration.as_secs_f32());
 }
 
-pub fn setup_main(force_download: bool, force_extract: bool, force_prune: bool) {
+pub fn setup_main(force_download: bool, force_extract: bool, force_prune: bool, quadtree: &mut spherical_quadtree::SphQtRoot) {
     let data_path: &Path = Path::new("./data/download/I_259.tar.gz");
     let extract_path: &Path = Path::new("./data/download/extract");
     let cache_path: &Path = Path::new("./data/cache/pruned_stars.dat");
@@ -219,6 +216,6 @@ pub fn setup_main(force_download: bool, force_extract: bool, force_prune: bool) 
         prune_stars(16.0);
     }
 
-    let mut quadtree = SphQtRoot::new();
-    generate_cpu_quadtree(&mut quadtree);
+    //let mut quadtree = SphQtRoot::new();
+    generate_cpu_quadtree(quadtree);
 }

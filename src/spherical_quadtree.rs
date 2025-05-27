@@ -10,13 +10,14 @@ pub struct StarData {
     pub vt: f32
 }
 
-struct SphQtNode {
-    star_idxs: Vec<StarData>,
-    corners: [[f32; 2]; 2], //corners, least coordinates in position 0 and greatest coordinates in position 1
+pub struct SphQtNode {
+    pub stars: Vec<StarData>,
+    pub corners: [[f32; 2]; 2], //corners, least coordinates in position 0 and greatest coordinates in position 1
     midpoint: [f32; 2],
     axes: [usize; 2], //x, y, z
     inactive_ax: usize,
-    children: [Option<Box<SphQtNode>>; 4]
+    pub children: [Option<Box<SphQtNode>>; 4],
+    pub stars_in_children: u64
 }
 
 
@@ -47,12 +48,13 @@ impl SphQtNode {
         let lowest_coords: [usize; 2] = [(corners[1][0] > corners[0][0]).into(), (corners[1][1] > corners[0][1]).into()];
 
         SphQtNode {
-            star_idxs: Vec::new(),
+            stars: Vec::new(),
             corners: [[corners[lowest_coords[0]][0], corners[lowest_coords[1]][1]], [corners[(lowest_coords[0] != 1) as usize][0], corners[(lowest_coords[1] != 1) as usize][1]]],
             midpoint: [(corners[0][0] + corners[1][0]) / 2.0, (corners[0][1] + corners[1][1]) / 2.0],
             axes: ax,
             inactive_ax: inac_ax,
-            children: [const{None}; 4]
+            children: [const{None}; 4],
+            stars_in_children: 0
         }
     }
 }
@@ -68,10 +70,10 @@ impl SphQtRoot {
         SphQtRoot { faces: [
             Some(Box::new(SphQtNode::new([[-1.0, -1.0], [1.0, 1.0]], [1, 2], 0))), //X+
             Some(Box::new(SphQtNode::new([[-1.0, -1.0], [1.0, 1.0]], [1, 2], 0))), //X-
-            Some(Box::new(SphQtNode::new([[1.0, -1.0], [1.0, 1.0]], [0, 2], 1))), //Y+
-            Some(Box::new(SphQtNode::new([[-1.0, -1.0], [-1.0, 1.0]], [0, 2], 1))), //Y-
-            Some(Box::new(SphQtNode::new([[-1.0, 1.0], [1.0, 1.0]], [0, 1], 2))), //Z+
-            Some(Box::new(SphQtNode::new([[-1.0, -1.0], [1.0, -1.0]], [0, 1], 2))), //Z-
+            Some(Box::new(SphQtNode::new([[-1.0, -1.0], [1.0, 1.0]], [0, 2], 1))), //Y+
+            Some(Box::new(SphQtNode::new([[-1.0, -1.0], [1.0, 1.0]], [0, 2], 1))), //Y-
+            Some(Box::new(SphQtNode::new([[-1.0, -1.0], [1.0, 1.0]], [0, 1], 2))), //Z+
+            Some(Box::new(SphQtNode::new([[-1.0, -1.0], [1.0, 1.0]], [0, 1], 2))), //Z-
         ], star_count: 0}
     }
 
@@ -149,13 +151,17 @@ impl SphQtRoot {
                 uw_parent.children[child_idx] = Some(Box::new(SphQtNode::new([uw_parent.midpoint, [uw_parent.corners[child_idx & 1][0], uw_parent.corners[child_idx >> 1][1]]], uw_parent.axes, uw_parent.inactive_ax)));
             }
 
+            //Add the child's star to the parent's count
+            uw_parent.stars_in_children += 1;
+
             //Recur down a layer
             cur_parent = &mut uw_parent.children[child_idx];
 
             depth += 1;
         }
         //Add star data to the leaf node
-        cur_parent.as_mut().unwrap().star_idxs.push(star);
+        cur_parent.as_mut().unwrap().stars.push(star);
+        cur_parent.as_mut().unwrap().stars_in_children += 1;
         self.star_count += 1;
 
         //append idx to the star_idxs at the leaf node
