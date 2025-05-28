@@ -15,15 +15,15 @@ use crate::spherical_quadtree::{SphQtNode, SphQtRoot};
 
 mod utils;
 
-const SCR_WIDTH: u32 = 1920;
-const SCR_HEIGHT: u32 = 1080;
+const SCR_WIDTH: u32 = 3840;
+const SCR_HEIGHT: u32 = 2160;
 
 struct WindowData {
     window: PWindow,
     events: GlfwReceiver<(f64, WindowEvent)>
 }
 
-fn draw_debug_quadtree_recur(parent: &Box<SphQtNode>, recursive_transformation: &glam::Mat3, max_side_stars: u64, depth: i32) {
+fn draw_debug_quadtree_recur(parent: &Box<SphQtNode>, recursive_transformation: &glam::Mat3, max_side_stars: u64, depth: i32, max_depth: i32) {
     //Transformation matrix should be passed down and applied and modified recursively TODO TODO TODO TODO
     //let edge_len = ((parent.corners[1][0] - parent.corners[0][0]) / 2.0).abs();
     let edge_len = 1.0 / (depth + 1) as f32;
@@ -47,7 +47,7 @@ fn draw_debug_quadtree_recur(parent: &Box<SphQtNode>, recursive_transformation: 
     let mut stars_not_in_children = parent.stars_in_children;
     let mut child_count = 0;
 
-    if depth < 11 {
+    if depth < max_depth {
         for c in &parent.children {
             if c.is_some() {
                 child_count += 1;
@@ -77,14 +77,14 @@ fn draw_debug_quadtree_recur(parent: &Box<SphQtNode>, recursive_transformation: 
     //let mut stars_not_in_children = parent.stars_in_children;
     //let mut child_count = 0;
     let mut i = 0;
-    if depth < 11 {
+    if depth < max_depth {
         for c in &parent.children {
             if c.is_some() {
                 let c_uw = c.as_ref().unwrap();
 
                 //Recur into the child
                 //if i == 0 || i==1 || i==2 {
-                draw_debug_quadtree_recur(c_uw, recursive_transformation, max_side_stars, depth + 1);
+                draw_debug_quadtree_recur(c_uw, recursive_transformation, max_side_stars, depth + 1, max_depth);
                 //}
             }
             i+=1;
@@ -92,7 +92,7 @@ fn draw_debug_quadtree_recur(parent: &Box<SphQtNode>, recursive_transformation: 
     }
 }
 
-fn draw_debug_quadtree(quadtree: &SphQtRoot) {
+fn draw_debug_quadtree(quadtree: &SphQtRoot, max_depth: i32) {
 
     //scale to base size
     //scale to 1 / (2^depth)
@@ -127,7 +127,7 @@ fn draw_debug_quadtree(quadtree: &SphQtRoot) {
 
         //transformation = glam::Mat3::IDENTITY;
 
-        draw_debug_quadtree_recur(side.as_ref().unwrap(), &transformation, max_side_stars, 0);
+        draw_debug_quadtree_recur(side.as_ref().unwrap(), &transformation, max_side_stars, 0, max_depth);
     }
 
     
@@ -161,11 +161,16 @@ fn render_setup(gl_context: &mut Glfw, scr_width: u32, scr_height: u32) -> Windo
     WindowData { window: window, events: events }
 }
 
-fn render_loop(gl_context: &mut Glfw, wd: &mut WindowData, render_draw: fn(&SphQtRoot), quadtree: &SphQtRoot) {
-    render_draw(quadtree);
-    wd.window.swap_buffers();
+fn render_loop(gl_context: &mut Glfw, wd: &mut WindowData, render_draw: fn(&SphQtRoot, i32), quadtree: &SphQtRoot) {
+    let mut already_drew_debug = false;
+    let mut debug_max_draw_depth = 5;
     while !wd.window.should_close() {
 
+        if !already_drew_debug { 
+            render_draw(quadtree, debug_max_draw_depth);
+            wd.window.swap_buffers();
+            already_drew_debug = true;
+        }
         //render_draw(quadtree);
 
         //Take keyboard input
@@ -175,6 +180,14 @@ fn render_loop(gl_context: &mut Glfw, wd: &mut WindowData, render_draw: fn(&SphQ
             match event {
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) =>
                     wd.window.set_should_close(true),
+                glfw::WindowEvent::Key(Key::Up, _, Action::Press, _) => {
+                    already_drew_debug = false;
+                    debug_max_draw_depth += 1;
+                }
+                glfw::WindowEvent::Key(Key::Down, _, Action::Press, _) => {
+                    already_drew_debug = false;
+                    debug_max_draw_depth -= 1;
+                }
                 _ => {}
             }
         }

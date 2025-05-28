@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-const MAX_DEPTH: i32 = 4;
+const MAX_DEPTH: i32 = 10;
 
 
 pub struct StarData {
