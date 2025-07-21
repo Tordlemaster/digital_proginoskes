@@ -64,7 +64,7 @@ pub fn init_utils() {
     }
 }
 
-fn load_shader(shader_type: gl::types::GLenum, source_filepath: &str) -> u32 {
+pub fn load_shader(shader_type: gl::types::GLenum, source_filepath: &str) -> u32 {
     let mut id = 0;
     let mut shader_code = String::new();
 
@@ -95,7 +95,7 @@ fn load_shader(shader_type: gl::types::GLenum, source_filepath: &str) -> u32 {
     id
 }
 
-fn load_shader_program(shaders: Vec<gl::types::GLuint>) -> gl::types::GLuint {
+pub fn load_shader_program(shaders: Vec<gl::types::GLuint>) -> gl::types::GLuint {
     let mut program_id: gl::types::GLuint = 0;
     unsafe {
         program_id = gl::CreateProgram();

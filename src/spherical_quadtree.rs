@@ -3,6 +3,7 @@ use std::str::FromStr;
 const MAX_DEPTH: i32 = 10;
 
 
+#[derive(Clone, Copy)]
 pub struct StarData {
     pub ra: f32, //Right ascension
     pub dec: f32, //Declination
