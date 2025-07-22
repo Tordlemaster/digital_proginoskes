@@ -7,13 +7,13 @@
 
 //Stars themselves have a solid angle (at least a perceptual one based on naked eye fov, that is invariant(doesn't change rel. to screen) to zoom level)
 
-use std::{cmp::max, ffi::{c_void, CString}, num, ptr::null, time::Duration, u64};
+use std::{cmp::max, f32::consts::PI, ffi::{c_void, CString}, num, ptr::null, time::Duration, u64};
 
 use glam::{Quat, Vec3};
 use glfw::{fail_on_errors, Action, Context, Glfw, GlfwReceiver, Key, PWindow, WindowEvent};
 use spin_sleep::sleep;
 use utils::{DEBUG_QT_UNI_DEPTH, DEBUG_QT_UNI_STARS, DEBUG_QT_UNI_TRANS};
-use crate::{render::utils::{load_shader, load_shader_program}, spherical_quadtree::{SphQtNode, SphQtRoot, StarData}};
+use crate::{render::utils::{deg_ams, load_blackbody_table, load_shader, load_shader_program, ra_dec_to_xyz}, spherical_quadtree::{SphQtNode, SphQtRoot, StarData}};
 
 mod utils;
 
@@ -164,6 +164,65 @@ fn star_list_recur(node: &Box<SphQtNode>, star_list: &mut Vec<StarData>) {
     }
 }
 
+fn setup_ursa_minor() -> (u32, u32) {
+    let mut um_vao = 0;
+    let mut um_vbo = 0;
+    let mut um_prog = 0;
+    let um_verts = [
+        ra_dec_to_xyz(
+            ((deg_ams(2.0, 31.0, 49.09) / 24.0) * 360.0).to_radians(),
+            deg_ams(89.0, 15.0, 50.8).to_radians()
+        ),
+        ra_dec_to_xyz(
+            ((deg_ams(17.0, 32.0, 12.99671) / 24.0) * 360.0).to_radians(),
+            deg_ams(86.0, 35.0, 11.2584).to_radians()
+        ),
+        ra_dec_to_xyz(
+            ((deg_ams(16.0, 45.0, 58.24168) / 24.0) * 360.0).to_radians(),
+            deg_ams(82.0, 2.0, 14.1233).to_radians()
+        ),
+        ra_dec_to_xyz(
+            ((deg_ams(15.0, 44.0, 3.51892) / 24.0) * 360.0).to_radians(),
+            deg_ams(77.0, 47.0, 40.1788).to_radians()
+        ),
+        ra_dec_to_xyz(
+            ((deg_ams(14.0, 50.0, 42.32580) / 24.0) * 360.0).to_radians(),
+            deg_ams(74.0, 9.0, 19.8142).to_radians()
+        ),
+        ra_dec_to_xyz(
+            ((deg_ams(15.0, 20.0, 43.71604) / 24.0) * 360.0).to_radians(),
+            deg_ams(71.0, 50.0, 2.4596).to_radians()
+        ),
+        ra_dec_to_xyz(
+            ((deg_ams(16.0, 17.0, 30.27025) / 24.0) * 360.0).to_radians(),
+            deg_ams(75.0, 45.0, 19.2351).to_radians()
+        ),
+        ra_dec_to_xyz(
+            ((deg_ams(15.0, 44.0, 3.51892) / 24.0) * 360.0).to_radians(),
+            deg_ams(77.0, 47.0, 40.1788).to_radians()
+        ),
+    ];
+    unsafe {
+        gl::GenVertexArrays(1, &raw mut um_vao);
+        gl::BindVertexArray(um_vao);
+
+        gl::GenBuffers(1, &raw mut um_vbo);
+        gl::BindBuffer(gl::ARRAY_BUFFER, um_vbo);
+
+        gl::BufferData(gl::ARRAY_BUFFER, (size_of_val(&um_verts)).try_into().unwrap(), (&raw const um_verts) as *const c_void, gl::STATIC_DRAW);
+        gl::EnableVertexAttribArray(0);
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, (3 * size_of::<f32>()).try_into().unwrap(), 0 as *const c_void);
+
+        gl::BindVertexArray(0);
+
+        um_prog = load_shader_program(vec![
+            load_shader(gl::VERTEX_SHADER, "./src/render/shaders/constellations.vert"),
+            load_shader(gl::FRAGMENT_SHADER, "./src/render/shaders/constellations.frag")
+        ]);
+    }
+    (um_vao, um_prog)
+}
+
 fn setup_draw_stars(quadtree: &SphQtRoot) -> (u32, u32, usize, u32, u32) {
     let mut stars = Vec::new();
     star_list(quadtree, &mut stars);
@@ -208,15 +267,20 @@ fn setup_draw_stars(quadtree: &SphQtRoot) -> (u32, u32, usize, u32, u32) {
         println!("map named buffer");
         let star_buf = gl::MapNamedBuffer(stars_vbo, gl::WRITE_ONLY);
         println!("write data");
+        let bb_table = load_blackbody_table();
         for i in 0..stars.len() {
             let s = &stars[i];
+            let s_temp = 7000.0 / (s.bt - s.vt + 0.56);
+            let s_irradiance = 10.0_f32.powf(0.4 * (-s.vt - 19.0));
+            let s_rgb = bb_table.temp_to_xy(s_temp).to_rgb() * s_irradiance * 1000000000.0;
+            let s_xyz = ra_dec_to_xyz(s.ra, s.dec);
             *(star_buf as *mut(f32, f32, f32, f32, f32, f32)).add(i) = (
-                s.dec.cos() * s.ra.sin(),
-                s.dec.sin(),
-                s.dec.cos() * s.ra.cos(),
-                1.0,
-                1.0,
-                1.0
+                s_xyz.0,
+                s_xyz.1,
+                s_xyz.2,
+                s_rgb.x,
+                s_rgb.y,
+                s_rgb.z
             );
         }
         println!("unmap buffer");
@@ -232,7 +296,7 @@ fn setup_draw_stars(quadtree: &SphQtRoot) -> (u32, u32, usize, u32, u32) {
 
         gl::GenBuffers(1, &raw mut cam_ubo);
         gl::BindBufferBase(gl::UNIFORM_BUFFER, 0, cam_ubo);
-        gl::BufferData(gl::UNIFORM_BUFFER, 16, null(), gl::DYNAMIC_DRAW);
+        gl::BufferData(gl::UNIFORM_BUFFER, (16 * size_of::<f32>()).try_into().unwrap(), null(), gl::DYNAMIC_DRAW);
         gl::BindBuffer(gl::UNIFORM_BUFFER, 0);
 
         println!("Load shader");
@@ -303,10 +367,11 @@ fn debug_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, render_draw: fn
 
 fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQtRoot) {
     let (stars_vao, stars_vbo, n_stars, cam_ubo, stars_program) = setup_draw_stars(quadtree);
+    let (um_vao, um_program) = setup_ursa_minor();
     println!("setup done");
     let n_stars: i32 = n_stars.try_into().unwrap();
 
-    let cam_proj = glam::Mat4::perspective_lh(70.0_f32.to_radians(), 16.0/9.0, 0.001, 100.0);
+    let cam_proj = glam::Mat4::perspective_lh(90.0_f32.to_radians(), 16.0/9.0, 0.001, 100.0);
     let mut cam_az = 0.0;
     let mut cam_ele = 0.0;
     let mut cam_view = glam::Mat4::from_rotation_translation(Quat::from_euler(glam::EulerRot::XYZEx, cam_ele, cam_az, 0.0), Vec3::ZERO);
@@ -327,19 +392,27 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
             //gl::BindBufferBase(gl::UNIFORM_BUFFER, 0, cam_ubo);
             //gl::BufferSubData(gl::UNIFORM_BUFFER, 0, (size_of::<f32>() * 16).try_into().unwrap(), (&raw const cam_proj_view) as *const c_void);
             //gl::BindBuffer(gl::UNIFORM_BUFFER, 0);
-            gl::NamedBufferSubData(cam_ubo, 0, (size_of::<f32>() * 16).try_into().unwrap(), (&raw const cam_proj_view) as *const c_void);
 
             let cpv = cam_proj_view.to_cols_array();
-            let b = b"cam_proj_view\0";
+            gl::NamedBufferSubData(cam_ubo, 0, (size_of::<f32>() * 16).try_into().unwrap(), (&raw const cpv) as *const c_void);
+            
+            /*let b = b"cam_proj_view\0";
             gl::UniformMatrix4fv(
                 gl::GetUniformLocation(stars_program, "cam_proj_view".as_ptr() as *const i8),
                 1,
                 gl::FALSE,
                 (&raw const cpv) as *const f32
-            );
+            );*/
 
             gl::Clear(gl::COLOR_BUFFER_BIT);
+
+            gl::BindVertexArray(stars_vao);
+            gl::UseProgram(stars_program);
             gl::DrawArrays(gl::POINTS, 0, n_stars);
+
+            gl::BindVertexArray(um_vao);
+            gl::UseProgram(um_program);
+            gl::DrawArrays(gl::LINE_STRIP, 0, 8);
 
             gl_context.poll_events();
             for (_, event) in glfw::flush_messages(&wd.events) {
@@ -362,6 +435,7 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
                     _ => {}
                 }
             }
+            cam_ele = cam_ele.clamp(const{-PI/2.0}, const{PI/2.0});
             wd.window.swap_buffers();
             sleep(Duration::from_millis(50));
         }

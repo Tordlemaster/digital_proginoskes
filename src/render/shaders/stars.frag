@@ -3,10 +3,10 @@
 out vec4 FragColor;
 
 in vec3 Pos;
-in vec3 Color;
-
-
+in vec3 raw_color;
 
 void main() {
-    FragColor = vec4(vec3((1.0 - distance(gl_PointCoord, vec2(0.5)))), 1.0);
+    vec3 color = raw_color;
+    color = pow(color, vec3(1.0 / 2.2));
+    FragColor = vec4(color, 1.0);
 }
