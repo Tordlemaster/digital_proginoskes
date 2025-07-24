@@ -420,6 +420,32 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
     }
     println!("go, {}", stars_program);
     while !wd.window.should_close() {
+        gl_context.poll_events();
+        for (_, event) in glfw::flush_messages(&wd.events) {
+            println!("{:?}", event);
+            match event {
+                glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) =>
+                    wd.window.set_should_close(true),
+                glfw::WindowEvent::Key(Key::Left, _, Action::Press, _) => {
+                    cam_az += 0.3;
+                }
+                glfw::WindowEvent::Key(Key::Right, _, Action::Press, _) => {
+                    cam_az -= 0.3;
+                }
+                glfw::WindowEvent::Key(Key::Up, _, Action::Press, _) => {
+                    cam_ele += 0.3;
+                }
+                glfw::WindowEvent::Key(Key::Down, _, Action::Press, _) => {
+                    cam_ele -= 0.3;
+                }
+                glfw::WindowEvent::Key(Key::Space, _, Action::Press, _) => {
+                    render_constellation = !render_constellation;
+                }
+                _ => {}
+            }
+        }
+        cam_ele = cam_ele.clamp(const{-PI/2.0}, const{PI/2.0});
+
         cam_view = glam::Mat4::from_quat(Quat::from_euler(glam::EulerRot::XYZ, cam_ele, cam_az, 0.0));
         let cam_proj_view = cam_proj * cam_view;
         //println!("{}", cam_proj_view);
@@ -446,12 +472,6 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
             gl::UseProgram(stars_program);
             gl::DrawArrays(gl::POINTS, 0, n_stars);
 
-            if render_constellation {
-                gl::BindVertexArray(um_vao);
-                gl::UseProgram(um_program);
-                gl::DrawArrays(gl::LINE_STRIP, 0, 8);
-            }
-
             gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
             gl::BindVertexArray(fbuf_vao);
@@ -459,34 +479,15 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
             gl::BindTexture(gl::TEXTURE_2D, hdr_fbuf_color);
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
 
-            gl_context.poll_events();
-            for (_, event) in glfw::flush_messages(&wd.events) {
-                println!("{:?}", event);
-                match event {
-                    glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) =>
-                        wd.window.set_should_close(true),
-                    glfw::WindowEvent::Key(Key::Left, _, Action::Press, _) => {
-                        cam_az += 0.3;
-                    }
-                    glfw::WindowEvent::Key(Key::Right, _, Action::Press, _) => {
-                        cam_az -= 0.3;
-                    }
-                    glfw::WindowEvent::Key(Key::Up, _, Action::Press, _) => {
-                        cam_ele += 0.3;
-                    }
-                    glfw::WindowEvent::Key(Key::Down, _, Action::Press, _) => {
-                        cam_ele -= 0.3;
-                    }
-                    glfw::WindowEvent::Key(Key::Space, _, Action::Press, _) => {
-                        render_constellation = !render_constellation;
-                    }
-                    _ => {}
-                }
+            if render_constellation {
+                gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+                gl::BindVertexArray(um_vao);
+                gl::UseProgram(um_program);
+                gl::DrawArrays(gl::LINE_STRIP, 0, 8);
             }
-            cam_ele = cam_ele.clamp(const{-PI/2.0}, const{PI/2.0});
-            wd.window.swap_buffers();
-            sleep(Duration::from_millis(50));
         }
+        wd.window.swap_buffers();
+        sleep(Duration::from_millis(50));
     }
 }
 
