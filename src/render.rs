@@ -223,7 +223,7 @@ fn setup_ursa_minor() -> (u32, u32) {
     (um_vao, um_prog)
 }
 
-fn setup_draw_stars(quadtree: &SphQtRoot) -> (u32, u32, usize, u32, u32) {
+fn setup_draw_stars(quadtree: &SphQtRoot) -> (u32, u32, usize, u32, u32, u32, u32, u32, u32, u32) {
     let mut stars = Vec::new();
     star_list(quadtree, &mut stars);
 
@@ -249,10 +249,15 @@ fn setup_draw_stars(quadtree: &SphQtRoot) -> (u32, u32, usize, u32, u32) {
     let mut stars_vbo = 0;
     let mut cam_ubo = 0;
     let mut stars_program = 0;
+    let mut hdr_fbuf = 0;
+    let mut hdr_fbuf_color = 0;
+    let mut fbuf_vao = 0;
+    let mut postprocess_program = 0;
+    let mut veiling_program = 0;
     unsafe {
         println!("Point size");
         gl::Enable(gl::POINT_SIZE);
-        gl::PointSize(11.0);
+        gl::PointSize(1.0);
 
         println!("VAO");
         gl::GenVertexArrays(1, &raw mut stars_vao);
@@ -272,7 +277,7 @@ fn setup_draw_stars(quadtree: &SphQtRoot) -> (u32, u32, usize, u32, u32) {
             let s = &stars[i];
             let s_temp = 7000.0 / (s.bt - s.vt + 0.56);
             let s_irradiance = 10.0_f32.powf(0.4 * (-s.vt - 19.0));
-            let s_rgb = bb_table.temp_to_xy(s_temp).to_rgb() * s_irradiance * 1000000000.0;
+            let s_rgb = bb_table.temp_to_xy(s_temp).to_rgb() * s_irradiance;
             let s_xyz = ra_dec_to_xyz(s.ra, s.dec);
             *(star_buf as *mut(f32, f32, f32, f32, f32, f32)).add(i) = (
                 s_xyz.0,
@@ -304,9 +309,39 @@ fn setup_draw_stars(quadtree: &SphQtRoot) -> (u32, u32, usize, u32, u32) {
             load_shader(gl::VERTEX_SHADER, "./src/render/shaders/stars.vert"),
             load_shader(gl::FRAGMENT_SHADER, "./src/render/shaders/stars.frag")
         ]);
+
+        gl::GenFramebuffers(1, &raw mut hdr_fbuf);
+        gl::BindFramebuffer(gl::FRAMEBUFFER, hdr_fbuf);
+        gl::GenTextures(1, &raw mut hdr_fbuf_color);
+        gl::BindTexture(gl::TEXTURE_2D, hdr_fbuf_color);
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA32F as i32, SCR_WIDTH as i32, SCR_HEIGHT as i32, 0, gl::RGBA, gl::FLOAT, null());
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+        gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, hdr_fbuf_color, 0);  
+        gl::BindTexture(gl::TEXTURE_2D, 0);
+
+        gl::GenVertexArrays(1, &raw mut fbuf_vao);
+        gl::BindVertexArray(fbuf_vao);
+        let mut fbuf_vbo = 0;
+        gl::GenBuffers(1, &raw mut fbuf_vbo);
+        gl::BindBuffer(gl::ARRAY_BUFFER, fbuf_vbo);
+        let screen_quad: [f32; 12] = [-1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0];
+        gl::BufferData(gl::ARRAY_BUFFER, (size_of_val(&screen_quad)).try_into().unwrap(), (&raw const screen_quad) as *const c_void, gl::STATIC_DRAW);
+        gl::EnableVertexAttribArray(0);
+        gl::VertexAttribPointer(0, 2, gl::FLOAT, gl::FALSE, (2 * size_of::<f32>()).try_into().unwrap(), 0 as *const c_void);
+        gl::BindVertexArray(0);
+
+        postprocess_program = load_shader_program(vec![
+            load_shader(gl::VERTEX_SHADER, "./src/render/shaders/postprocess.vert"),
+            load_shader(gl::FRAGMENT_SHADER, "./src/render/shaders/postprocess.frag")
+        ]);
+        veiling_program = load_shader_program(vec![
+            load_shader(gl::VERTEX_SHADER, "./src/render/shaders/postprocess.vert"),
+            load_shader(gl::FRAGMENT_SHADER, "./src/render/shaders/veiling.frag")
+        ]);
     }
     println!("{}", stars_program);
-    (stars_vao, stars_vbo, stars.len(), cam_ubo, stars_program)
+    (stars_vao, stars_vbo, stars.len(), cam_ubo, stars_program, hdr_fbuf, hdr_fbuf_color, fbuf_vao, postprocess_program, veiling_program)
 }
 
 fn render_setup(gl_context: &mut Glfw, scr_width: u32, scr_height: u32) -> WindowData {
@@ -366,16 +401,17 @@ fn debug_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, render_draw: fn
 }
 
 fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQtRoot) {
-    let (stars_vao, stars_vbo, n_stars, cam_ubo, stars_program) = setup_draw_stars(quadtree);
+    let (stars_vao, stars_vbo, n_stars, cam_ubo, stars_program, hdr_fbuf, hdr_fbuf_color, fbuf_vao, postprocess_prog, veiling_prog) = setup_draw_stars(quadtree);
     let (um_vao, um_program) = setup_ursa_minor();
     println!("setup done");
     let n_stars: i32 = n_stars.try_into().unwrap();
 
-    let cam_proj = glam::Mat4::perspective_lh(90.0_f32.to_radians(), 16.0/9.0, 0.001, 100.0);
+    let cam_proj = glam::Mat4::perspective_lh(70.0_f32.to_radians(), 16.0/9.0, 0.001, 100.0);
     let mut cam_az = 0.0;
     let mut cam_ele = 0.0;
     let mut cam_view = glam::Mat4::from_rotation_translation(Quat::from_euler(glam::EulerRot::XYZEx, cam_ele, cam_az, 0.0), Vec3::ZERO);
-
+    let mut render_constellation = true;
+    
     unsafe {
         gl::BindVertexArray(stars_vao);
         gl::UseProgram(stars_program);
@@ -404,15 +440,24 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
                 (&raw const cpv) as *const f32
             );*/
 
+            gl::BindFramebuffer(gl::FRAMEBUFFER, hdr_fbuf);
             gl::Clear(gl::COLOR_BUFFER_BIT);
-
             gl::BindVertexArray(stars_vao);
             gl::UseProgram(stars_program);
             gl::DrawArrays(gl::POINTS, 0, n_stars);
 
-            gl::BindVertexArray(um_vao);
-            gl::UseProgram(um_program);
-            gl::DrawArrays(gl::LINE_STRIP, 0, 8);
+            if render_constellation {
+                gl::BindVertexArray(um_vao);
+                gl::UseProgram(um_program);
+                gl::DrawArrays(gl::LINE_STRIP, 0, 8);
+            }
+
+            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+            gl::BindVertexArray(fbuf_vao);
+            gl::UseProgram(veiling_prog);
+            gl::BindTexture(gl::TEXTURE_2D, hdr_fbuf_color);
+            gl::DrawArrays(gl::TRIANGLES, 0, 6);
 
             gl_context.poll_events();
             for (_, event) in glfw::flush_messages(&wd.events) {
@@ -431,6 +476,9 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
                     }
                     glfw::WindowEvent::Key(Key::Down, _, Action::Press, _) => {
                         cam_ele -= 0.3;
+                    }
+                    glfw::WindowEvent::Key(Key::Space, _, Action::Press, _) => {
+                        render_constellation = !render_constellation;
                     }
                     _ => {}
                 }

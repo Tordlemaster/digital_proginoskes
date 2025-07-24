@@ -213,7 +213,7 @@ pub fn setup_main(force_download: bool, force_extract: bool, force_prune: bool, 
         extract_data();
     }
     if force_prune || force_download || force_extract || !cache_path.exists() {
-        prune_stars(5.0);
+        prune_stars(10.0);
     }
 
     //let mut quadtree = SphQtRoot::new();

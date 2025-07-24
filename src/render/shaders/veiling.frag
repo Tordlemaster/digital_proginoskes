@@ -1,9 +1,10 @@
 #version 420 core
 
+in vec2 FragPos;
+
 out vec4 FragColor;
 
-in vec3 Pos;
-in vec3 raw_color;
+uniform sampler2D fbuf;
 
 mat3 rgb_to_xyz = mat3(
     vec3(0.4124564, 0.2126729, 0.0193339),
@@ -38,16 +39,39 @@ vec3 xyY_to_xyz(vec3 color) {
     return vec3((color.z / color.y) * color.x, color.z, (color.z / color.y) * (1.0 - color.x - color.y));
 }
 
+vec2 resolution = vec2(3840, 2160);
+vec2 fov = vec2(124.4444444, 70.0);
+float radians_per_px = radians(2160.0 / 70.0);
+
 void main() {
-    /*vec3 xyz_color = rgb_to_xyz * raw_color;
+
+    vec3 numerator;
+    float denominator;
+
+    ivec2 px_coords = ivec2(FragPos * resolution);
+
+    for (int x=-17; x<=17; x++) {
+        for (int y=-17; y<=17; y++) {
+            if (y==0 && x==0) {
+                continue;
+            }
+            vec2 sample_offset = vec2(x, y);
+            float theta = length(sample_offset) * radians_per_px;
+            float a = cos(theta) / (theta * theta);
+            denominator += a;
+            numerator += texelFetch(fbuf, ivec2(x, y) + px_coords, 0).rgb * a;
+        }
+    }
+
+    vec3 color = 0.913 * texelFetch(fbuf, px_coords, 0).rgb + 0.087 * (numerator / vec3(denominator));
+    //FragColor = vec4(total, 1.0);
+    vec3 xyz_color = rgb_to_xyz * color;
     float scotopic_luminance = xyz_color.y * (1.33 * (1.0 + (xyz_color.y + xyz_color.z) / xyz_color.x) - 1.68);
     //xyz_color.y = 0.000000000001;
-    vec3 color = raw_color;
     color = mix(vec3(scotopic_luminance), color, 0.8);
     //color = raw_color;
     //color *= 500000000.0;
     color = vec3(1.0) - exp(-color * 10000000000.0);
     color = pow(color, vec3(1.0 / 2.2));
-    FragColor = vec4(color, 1.0);*/
-    FragColor = vec4(raw_color, 1.0);
+    FragColor = vec4(color, 1.0);
 }
