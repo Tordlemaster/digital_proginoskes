@@ -434,18 +434,6 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
             match event {
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) =>
                     wd.window.set_should_close(true),
-                glfw::WindowEvent::Key(Key::Left, _, Action::Press, _) => {
-                    cam_az += 0.3;
-                }
-                glfw::WindowEvent::Key(Key::Right, _, Action::Press, _) => {
-                    cam_az -= 0.3;
-                }
-                glfw::WindowEvent::Key(Key::Up, _, Action::Press, _) => {
-                    cam_ele += 0.3;
-                }
-                glfw::WindowEvent::Key(Key::Down, _, Action::Press, _) => {
-                    cam_ele -= 0.3;
-                }
                 glfw::WindowEvent::Key(Key::Space, _, Action::Press, _) => {
                     render_constellation = !render_constellation;
                 }
