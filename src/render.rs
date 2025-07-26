@@ -10,7 +10,7 @@
 use std::{cmp::max, f32::consts::PI, ffi::{c_void, CString}, num, ptr::null, time::Duration, u64};
 
 use glam::{Quat, Vec3};
-use glfw::{fail_on_errors, Action, Context, Glfw, GlfwReceiver, Key, PWindow, WindowEvent};
+use glfw::{fail_on_errors, ffi::glfwSetInputMode, Action, Context, Glfw, GlfwReceiver, Key, PWindow, WindowEvent};
 use spin_sleep::sleep;
 use utils::{DEBUG_QT_UNI_DEPTH, DEBUG_QT_UNI_STARS, DEBUG_QT_UNI_TRANS};
 use crate::{render::utils::{deg_ams, load_blackbody_table, load_shader, load_shader_program, ra_dec_to_xyz}, spherical_quadtree::{SphQtNode, SphQtRoot, StarData}};
@@ -355,6 +355,7 @@ fn render_setup(gl_context: &mut Glfw, scr_width: u32, scr_height: u32) -> Windo
     let (mut window, events) = gl_context.create_window(scr_width, scr_height, "Digital Progonoskes", glfw::WindowMode::Windowed).expect("Failed to create window");
     window.make_current();
     window.set_key_polling(true);
+    window.set_cursor_mode(glfw::CursorMode::Disabled);
 
     gl::load_with(|s| window.get_proc_address(s));
 
@@ -407,6 +408,7 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
     let n_stars: i32 = n_stars.try_into().unwrap();
 
     let cam_proj = glam::Mat4::perspective_lh(70.0_f32.to_radians(), 16.0/9.0, 0.001, 100.0);
+    let mut old_cursor_pos = (0.0, 0.0);
     let mut cam_az = 0.0;
     let mut cam_ele = 0.0;
     let mut cam_view = glam::Mat4::from_rotation_translation(Quat::from_euler(glam::EulerRot::XYZEx, cam_ele, cam_az, 0.0), Vec3::ZERO);
@@ -421,6 +423,12 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
     println!("go, {}", stars_program);
     while !wd.window.should_close() {
         gl_context.poll_events();
+
+        let (c_x,c_y ) = wd.window.get_cursor_pos();
+        cam_az -= (c_x as f32 - old_cursor_pos.0) * 0.001;
+        cam_ele -= (c_y as f32 - old_cursor_pos.1) * 0.001;
+        old_cursor_pos = (c_x as f32, c_y as f32);
+
         for (_, event) in glfw::flush_messages(&wd.events) {
             println!("{:?}", event);
             match event {
