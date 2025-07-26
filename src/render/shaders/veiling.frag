@@ -5,6 +5,9 @@ in vec2 FragPos;
 out vec4 FragColor;
 
 uniform sampler2D fbuf;
+uniform vec2 resolution;
+uniform float aspect_ratio;
+uniform vec2 fov;
 
 mat3 rgb_to_xyz = mat3(
     vec3(0.4124564, 0.2126729, 0.0193339),
@@ -39,11 +42,6 @@ vec3 xyY_to_xyz(vec3 color) {
     return vec3((color.z / color.y) * color.x, color.z, (color.z / color.y) * (1.0 - color.x - color.y));
 }
 
-vec2 resolution = vec2(3840, 2160);
-float aspect_ratio = resolution.x/resolution.y;
-vec2 fov = vec2(124.4444444, 70.0);
-float radians_per_px = radians(2160.0 / 70.0);
-
 void main() {
 
     vec3 numerator;
@@ -51,13 +49,13 @@ void main() {
 
     ivec2 px_coords = ivec2(FragPos * resolution);
 
-    for (int x=-9; x<=9; x++) {
-        for (int y=-9; y<=9; y++) {
+    for (int x=-12; x<=12; x++) {
+        for (int y=-12; y<=12; y++) {
             if (y==0 && x==0) {
                 continue;
             }
             vec2 sample_offset = vec2(x, y) * (2.5/2160.0) / vec2(aspect_ratio, 1.0);
-            float theta = length(sample_offset) * radians_per_px;
+            float theta = length(sample_offset) * 70.0;//radians_per_px;
             float a = cos(theta) / (theta * theta);
             denominator += a;
             numerator += texture(fbuf, sample_offset + FragPos, 0).rgb * a;

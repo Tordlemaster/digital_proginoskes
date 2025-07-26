@@ -19,6 +19,8 @@ mod utils;
 
 const SCR_WIDTH: u32 = 3840;
 const SCR_HEIGHT: u32 = 2160;
+const FOV_VERT: f32 = 70.0_f32.to_radians();
+const ASPECT_RATIO: f32 = (SCR_WIDTH as f32) / (SCR_HEIGHT as f32);
 
 struct WindowData {
     window: PWindow,
@@ -407,7 +409,7 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
     println!("setup done");
     let n_stars: i32 = n_stars.try_into().unwrap();
 
-    let cam_proj = glam::Mat4::perspective_lh(70.0_f32.to_radians(), 16.0/9.0, 0.001, 100.0);
+    let cam_proj = glam::Mat4::perspective_lh(FOV_VERT, ASPECT_RATIO, 0.001, 100.0);
     let mut old_cursor_pos = (0.0, 0.0);
     let mut cam_az = 0.0;
     let mut cam_ele = 0.0;
@@ -415,7 +417,25 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
     let mut render_constellation = true;
     
     unsafe {
-        gl::BindVertexArray(stars_vao);
+        gl::UseProgram(veiling_prog);
+        gl::Uniform2f(
+            gl::GetUniformLocation(veiling_prog, "resolution\0".as_ptr() as *const i8),
+            SCR_WIDTH as f32,
+            SCR_HEIGHT as f32,
+        );
+        gl::Uniform1f(
+            gl::GetUniformLocation(veiling_prog, "aspect_ratio\0".as_ptr() as *const i8),
+            ASPECT_RATIO,
+        );
+        gl::Uniform2f(
+            gl::GetUniformLocation(veiling_prog, "fov\0".as_ptr() as *const i8),
+            ASPECT_RATIO * FOV_VERT,
+            FOV_VERT,
+        );
+        gl::Uniform1i(
+            gl::GetUniformLocation(veiling_prog, "fbuf\0".as_ptr() as *const i8),
+            0
+        );
         gl::UseProgram(stars_program);
         gl::Disable(gl::DEPTH_TEST);
         gl::ClearColor(0.0, 0.0, 0.0, 1.0);
@@ -472,6 +492,7 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
             gl::Clear(gl::COLOR_BUFFER_BIT);
             gl::BindVertexArray(fbuf_vao);
             gl::UseProgram(veiling_prog);
+            gl::ActiveTexture(gl::TEXTURE0);
             gl::BindTexture(gl::TEXTURE_2D, hdr_fbuf_color);
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
 
@@ -483,7 +504,7 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
             }
         }
         wd.window.swap_buffers();
-        sleep(Duration::from_millis(50));
+        //sleep(Duration::from_millis(50));
     }
 }
 
