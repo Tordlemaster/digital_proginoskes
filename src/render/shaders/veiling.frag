@@ -40,6 +40,7 @@ vec3 xyY_to_xyz(vec3 color) {
 }
 
 vec2 resolution = vec2(3840, 2160);
+float aspect_ratio = resolution.x/resolution.y;
 vec2 fov = vec2(124.4444444, 70.0);
 float radians_per_px = radians(2160.0 / 70.0);
 
@@ -50,16 +51,16 @@ void main() {
 
     ivec2 px_coords = ivec2(FragPos * resolution);
 
-    for (int x=-17; x<=17; x++) {
-        for (int y=-17; y<=17; y++) {
+    for (int x=-9; x<=9; x++) {
+        for (int y=-9; y<=9; y++) {
             if (y==0 && x==0) {
                 continue;
             }
-            vec2 sample_offset = vec2(x, y);
+            vec2 sample_offset = vec2(x, y) * (2.5/2160.0) / vec2(aspect_ratio, 1.0);
             float theta = length(sample_offset) * radians_per_px;
             float a = cos(theta) / (theta * theta);
             denominator += a;
-            numerator += texelFetch(fbuf, ivec2(x, y) + px_coords, 0).rgb * a;
+            numerator += texture(fbuf, sample_offset + FragPos, 0).rgb * a;
         }
     }
 
