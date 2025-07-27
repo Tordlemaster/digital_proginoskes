@@ -354,7 +354,7 @@ fn render_setup(gl_context: &mut Glfw, scr_width: u32, scr_height: u32) -> Windo
         gl_context.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
     }
 
-    let (mut window, events) = gl_context.create_window(scr_width, scr_height, "Digital Progonoskes", glfw::WindowMode::Windowed).expect("Failed to create window");
+    let (mut window, events) = gl_context.create_window(scr_width, scr_height, "Digital Proginoskes", glfw::WindowMode::Windowed).expect("Failed to create window");
     window.make_current();
     window.set_key_polling(true);
     window.set_cursor_mode(glfw::CursorMode::Disabled);

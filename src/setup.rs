@@ -137,8 +137,8 @@ fn prune_stars(min_magnitude: f32) {
             }*/
 
             if entry[2].len() > 0 && entry[3].len() > 0 && entry[17].len() > 0 && entry[19].len() > 0 && entry[19].parse::<f32>().unwrap() < min_magnitude && !entry[1].contains(|x|{x=='P' || x=='X'}) {
-                let ra = entry[2].parse::<f32>().expect("RA not a valid f32").to_ne_bytes();
-                let dec = entry[3].parse::<f32>().expect("Dec not a valid f32").to_ne_bytes();
+                let ra = entry[24].parse::<f32>().expect("RA not a valid f32").to_ne_bytes();
+                let dec = entry[25].parse::<f32>().expect("Dec not a valid f32").to_ne_bytes();
                 let bt = entry[17].parse::<f32>().expect("BT not a valid f32").to_ne_bytes();
                 let vt = entry[19].parse::<f32>().expect("VT not a valid f32").to_ne_bytes();
                 match write_buf.write(&ra) {
