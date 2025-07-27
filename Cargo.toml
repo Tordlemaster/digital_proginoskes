@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 curl = "0.4.47"
-fitrs = "0.5.0"
 gl = "0.14.0"
 glam = "0.30.3"
 glfw = "0.59.0"
