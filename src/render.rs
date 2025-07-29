@@ -7,7 +7,7 @@
 
 //Stars themselves have a solid angle (at least a perceptual one based on naked eye fov, that is invariant(doesn't change rel. to screen) to zoom level)
 
-use std::{cmp::max, f32::consts::PI, ffi::{c_void, CString}, num, ptr::null, time::Duration, u64};
+use std::{cmp::max, f32::consts::PI, ffi::{c_void, CString}, num, ptr::null, time::{Duration, Instant}, u64};
 
 use glam::{Quat, Vec3};
 use glfw::{fail_on_errors, ffi::glfwSetInputMode, Action, Context, Glfw, GlfwReceiver, Key, PWindow, WindowEvent};
@@ -278,7 +278,7 @@ fn setup_draw_stars(quadtree: &SphQtRoot) -> (u32, u32, usize, u32, u32, u32, u3
         for i in 0..stars.len() {
             let s = &stars[i];
             let s_temp = 7000.0 / (s.bt - s.vt + 0.56);
-            let s_irradiance = 10.0_f32.powf(0.4 * (-s.vt - 19.0));
+            let s_irradiance = 10.0_f32.powf(0.4 * (-s.vt - 19.0 + 0.4));
             let s_rgb = bb_table.temp_to_xy(s_temp).to_rgb() * s_irradiance;
             let s_xyz = ra_dec_to_xyz(s.ra, s.dec);
             *(star_buf as *mut(f32, f32, f32, f32, f32, f32)).add(i) = (
@@ -415,6 +415,7 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
     let mut cam_ele = 0.0;
     let mut cam_view = glam::Mat4::from_rotation_translation(Quat::from_euler(glam::EulerRot::XYZEx, cam_ele, cam_az, 0.0), Vec3::ZERO);
     let mut render_constellation = true;
+    let mut time_location = 0;
     
     unsafe {
         gl::UseProgram(veiling_prog);
@@ -437,10 +438,12 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
             0
         );
         gl::UseProgram(stars_program);
+        time_location = gl::GetUniformLocation(stars_program, "time\0".as_ptr() as *const i8);
         gl::Disable(gl::DEPTH_TEST);
         gl::ClearColor(0.0, 0.0, 0.0, 1.0);
     }
     println!("go, {}", stars_program);
+    let start = Instant::now();
     while !wd.window.should_close() {
         gl_context.poll_events();
 
@@ -486,6 +489,7 @@ fn stars_render_loop(gl_context: &mut Glfw, wd: &mut WindowData, quadtree: &SphQ
             gl::Clear(gl::COLOR_BUFFER_BIT);
             gl::BindVertexArray(stars_vao);
             gl::UseProgram(stars_program);
+            gl::Uniform1f(time_location, start.elapsed().as_secs_f32());
             gl::DrawArrays(gl::POINTS, 0, n_stars);
 
             gl::BindFramebuffer(gl::FRAMEBUFFER, 0);

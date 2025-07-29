@@ -7,10 +7,13 @@ layout (std140, binding = 0) uniform Cam {
 };
 
 out vec3 Pos;
+out vec2 screen_pos;
 out vec3 raw_color;
 
 void main() {
     Pos = aPos;
     raw_color = aColor;
-    gl_Position = proj_view * vec4(aPos, 1.0);
+    vec4 g = proj_view * vec4(aPos, 1.0);
+    screen_pos = g.xy;
+    gl_Position = g;
 }

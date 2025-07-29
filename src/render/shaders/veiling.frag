@@ -55,7 +55,7 @@ void main() {
                 continue;
             }
             vec2 sample_offset = vec2(x, y) * (2.5/2160.0) / vec2(aspect_ratio, 1.0);
-            float theta = length(sample_offset) * 70.0;//radians_per_px;
+            float theta = length(sample_offset) * fov.y;//radians_per_px;
             float a = cos(theta) / (theta * theta);
             denominator += a;
             numerator += texture(fbuf, sample_offset + FragPos, 0).rgb * a;
@@ -70,7 +70,7 @@ void main() {
     color = mix(vec3(scotopic_luminance), color, 0.8);
     //color = raw_color;
     //color *= 500000000.0;
-    color = vec3(1.0) - exp(-color * 10000000000.0);
+    color = vec3(1.0) - exp(-color * 2000000000.0);
     color = pow(color, vec3(1.0 / 2.2));
     FragColor = vec4(color, 1.0);
 }
